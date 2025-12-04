@@ -251,6 +251,67 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .language-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .language-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .language-checkbox:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .language-checkbox input[type="checkbox"] {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .language-checkbox input[type="checkbox"]:checked + span {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .translated-section {
+            margin-bottom: 30px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            background: white;
+        }
+
+        .translated-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .copy-btn-small {
+            background: #4caf50;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 6px;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -260,6 +321,10 @@
 
         <div class="info-box">
             ⚠️ <strong>제외 영역:</strong> .nav, .footer_24, .partners_logo__slide__wrap 요소는 자동으로 제외됩니다
+        </div>
+
+        <div class="info-box" style="background: #e8f5e9; border-color: #4caf50;">
+            ✅ <strong>무료 번역:</strong> Google Translate를 사용하여 API 키 없이 무료로 번역합니다
         </div>
 
         <div class="method-tabs">
@@ -287,6 +352,23 @@
             </button>
         </div>
 
+        <div id="translationOptions" style="display: none; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+            <h3 style="margin-bottom: 15px; color: #333;">🌐 번역 옵션</h3>
+            
+            <div class="input-section">
+                <label>번역할 언어 선택</label>
+                <div style="margin-bottom: 10px;">
+                    <button class="secondary-btn" onclick="toggleAllLanguages()" style="margin-right: 10px;">전체 선택/해제</button>
+                    <span style="font-size: 13px; color: #666;">💡 원하는 언어만 선택하세요</span>
+                </div>
+                <div class="language-grid" id="languageGrid"></div>
+            </div>
+
+            <button onclick="startTranslation()" id="translateBtn" class="secondary-btn">
+                선택한 언어로 번역 (Google Translate)
+            </button>
+        </div>
+
         <div id="status"></div>
 
         <div class="results" id="results">
@@ -302,6 +384,44 @@
 
     <script>
         let extractedTexts = [];
+        let translatedResults = {};
+
+        const languages = [
+            { code: 'de', name: '독일어', flag: '🇩🇪' },
+            { code: 'ja', name: '일본어', flag: '🇯🇵' },
+            { code: 'es', name: '스페인어', flag: '🇪🇸' },
+            { code: 'ru', name: '러시아어', flag: '🇷🇺' },
+            { code: 'fr', name: '프랑스어', flag: '🇫🇷' },
+            { code: 'ar', name: '아랍어', flag: '🇸🇦' },
+            { code: 'pt', name: '포르투갈어', flag: '🇵🇹' },
+            { code: 'ko', name: '한국어', flag: '🇰🇷' },
+            { code: 'vi', name: '베트남어', flag: '🇻🇳' },
+            { code: 'zh', name: '중국어', flag: '🇨🇳' }
+        ];
+
+        // Initialize language checkboxes
+        const languageGrid = document.getElementById('languageGrid');
+        languages.forEach(lang => {
+            const div = document.createElement('div');
+            div.className = 'language-checkbox';
+            div.innerHTML = `
+                <input type="checkbox" id="lang-${lang.code}" value="${lang.code}">
+                <span>${lang.flag} ${lang.name}</span>
+            `;
+            div.onclick = function(e) {
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = this.querySelector('input');
+                    checkbox.checked = !checkbox.checked;
+                }
+            };
+            languageGrid.appendChild(div);
+        });
+
+        function toggleAllLanguages() {
+            const checkboxes = document.querySelectorAll('.language-grid input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        }
 
         function switchTab(method) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
@@ -321,11 +441,32 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
-            // Remove excluded elements
-            doc.querySelectorAll('.nav, .footer_24, .partners_logo__slide__wrap, script, style, noscript, meta, link').forEach(el => el.remove());
-            
             const extractedItems = [];
             const seenTexts = new Set();
+            
+            // Extract Meta Title (BEFORE removing meta tags)
+            const metaTitle = doc.querySelector('title');
+            if (metaTitle && metaTitle.textContent.trim()) {
+                extractedItems.push({
+                    type: 'META-TITLE',
+                    html: metaTitle.textContent.trim(),
+                    text: metaTitle.textContent.trim()
+                });
+            }
+            
+            // Extract Meta Description (BEFORE removing meta tags)
+            const metaDesc = doc.querySelector('meta[name="description"]') || 
+                           doc.querySelector('meta[property="og:description"]');
+            if (metaDesc && metaDesc.content && metaDesc.content.trim()) {
+                extractedItems.push({
+                    type: 'META-DESC',
+                    html: metaDesc.content.trim(),
+                    text: metaDesc.content.trim()
+                });
+            }
+            
+            // NOW remove excluded elements (including meta tags)
+            doc.querySelectorAll('.nav, .footer_24, .partners_logo__slide__wrap, script, style, noscript, meta, link').forEach(el => el.remove());
             
             // Helper to get plain text for deduplication
             function getPlainText(element) {
@@ -501,6 +642,8 @@
                 
                 // Create type badge with color
                 const typeColor = {
+                    'META-TITLE': '#8e44ad',
+                    'META-DESC': '#c0392b',
                     'H1': '#e74c3c',
                     'H2': '#e67e22',
                     'H3': '#f39c12',
@@ -526,6 +669,9 @@
 
             // Scroll to results
             resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // Always show translation options (no API key needed for Google Translate)
+            document.getElementById('translationOptions').style.display = 'block';
         }
 
         function copyText(index) {
@@ -561,6 +707,179 @@
             a.download = 'extracted-texts.txt';
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        async function startTranslation() {
+            const selectedLangs = Array.from(document.querySelectorAll('.language-grid input:checked'))
+                .map(cb => cb.value);
+
+            if (selectedLangs.length === 0) {
+                showStatus('번역할 언어를 최소 1개 이상 선택해주세요', 'error');
+                return;
+            }
+
+            if (extractedTexts.length === 0) {
+                showStatus('먼저 텍스트를 추출해주세요', 'error');
+                return;
+            }
+
+            const translateBtn = document.getElementById('translateBtn');
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '번역 중<span class="loading"></span>';
+
+            try {
+                translatedResults = {};
+
+                for (const langCode of selectedLangs) {
+                    const lang = languages.find(l => l.code === langCode);
+                    showStatus(`${lang.flag} ${lang.name} 번역 중... (${Object.keys(translatedResults).length + 1}/${selectedLangs.length})`, 'info');
+                    
+                    const translations = await translateTexts(extractedTexts, langCode);
+                    translatedResults[langCode] = { texts: extractedTexts, translations, lang };
+                    
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                displayTranslations();
+                showStatus('모든 번역이 완료되었습니다! ✅', 'success');
+
+            } catch (error) {
+                console.error(error);
+                showStatus('번역 오류: ' + error.message, 'error');
+            } finally {
+                translateBtn.disabled = false;
+                translateBtn.textContent = '선택한 언어로 번역 (Google Translate)';
+            }
+        }
+
+        async function translateTexts(items, targetLang) {
+            const translations = [];
+            
+            // Translate each item individually to maintain order
+            for (const item of items) {
+                try {
+                    const translated = await translateWithGoogle(item.text, targetLang);
+                    translations.push(translated);
+                    
+                    // Small delay between requests
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } catch (error) {
+                    console.error('Translation error for item:', error);
+                    translations.push(item.text); // Fallback to original text
+                }
+            }
+
+            return translations;
+        }
+
+        async function translateWithGoogle(text, targetLang) {
+            // Using Google Translate's unofficial API endpoint
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // Extract translated text from response
+                if (data && data[0]) {
+                    const translated = data[0].map(item => item[0]).join('');
+                    return translated;
+                }
+                
+                return text; // Fallback to original
+            } catch (error) {
+                console.error('Google Translate error:', error);
+                return text; // Fallback to original
+            }
+        }
+
+        function displayTranslations() {
+            // Create or get translations container
+            let translationsDiv = document.getElementById('translations');
+            if (!translationsDiv) {
+                translationsDiv = document.createElement('div');
+                translationsDiv.id = 'translations';
+                translationsDiv.style.marginTop = '40px';
+                document.getElementById('results').appendChild(translationsDiv);
+            }
+
+            translationsDiv.innerHTML = '<h2 style="color: #667eea; margin-bottom: 20px;">🌐 번역 결과</h2>';
+
+            Object.entries(translatedResults).forEach(([langCode, data]) => {
+                const section = document.createElement('div');
+                section.className = 'translated-section';
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'translated-title';
+                titleDiv.innerHTML = `
+                    ${data.lang.flag} ${data.lang.name}
+                    <button class="copy-btn-small" onclick="copyAllTranslations('${langCode}')">
+                        전체 복사
+                    </button>
+                `;
+                section.appendChild(titleDiv);
+
+                const textListDiv = document.createElement('div');
+                textListDiv.className = 'text-list';
+
+                data.texts.forEach((original, index) => {
+                    const translated = data.translations[index] || '[번역 오류]';
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'text-item';
+                    
+                    const typeColor = {
+                        'META-TITLE': '#8e44ad',
+                        'META-DESC': '#c0392b',
+                        'H1': '#e74c3c',
+                        'H2': '#e67e22',
+                        'H3': '#f39c12',
+                        'H4': '#f1c40f',
+                        'H5': '#3498db',
+                        'P': '#2ecc71',
+                        'LI': '#9b59b6',
+                        'DIV': '#95a5a6',
+                        'SPAN': '#34495e',
+                        'A': '#1abc9c'
+                    }[original.type] || '#7f8c8d';
+                    
+                    itemDiv.innerHTML = `
+                        <div class="text-number">
+                            <span style="background: ${typeColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 8px;">${original.type}</span>
+                            #${index + 1}
+                        </div>
+                        <div class="text-content" id="${langCode}-${index}">${translated}</div>
+                        <button class="copy-btn" onclick="copyTranslation('${langCode}', ${index})">복사</button>
+                    `;
+                    textListDiv.appendChild(itemDiv);
+                });
+
+                section.appendChild(textListDiv);
+                translationsDiv.appendChild(section);
+            });
+        }
+
+        function copyTranslation(langCode, index) {
+            const element = document.getElementById(`${langCode}-${index}`);
+            const text = element.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = element.nextElementSibling;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ 복사됨';
+                btn.style.background = '#4caf50';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            });
+        }
+
+        function copyAllTranslations(langCode) {
+            const translations = translatedResults[langCode].translations;
+            const text = translations.join('\n\n');
+            navigator.clipboard.writeText(text).then(() => {
+                showStatus(`${langCode.toUpperCase()} 전체 번역이 클립보드에 복사되었습니다!`, 'success');
+            });
         }
     </script>
 </body>

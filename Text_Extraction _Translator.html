@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹페이지 텍스트 추출기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .secondary-btn {
+            background: #4caf50;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        #status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            display: block;
+        }
+
+        #status.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+
+        #status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+
+        .results {
+            margin-top: 40px;
+            display: none;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .result-count {
+            font-size: 14px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 6px 12px;
+            border-radius: 6px;
+        }
+
+        .text-list {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .text-item {
+            margin-bottom: 16px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            position: relative;
+            border-left: 4px solid #667eea;
+        }
+
+        .text-number {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .text-content {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+            padding-right: 80px;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            padding: 6px 12px;
+            font-size: 12px;
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            margin: 0;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #856404;
+        }
+
+        .method-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .method-content {
+            display: none;
+        }
+
+        .method-content.active {
+            display: block;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 웹페이지 텍스트 추출기</h1>
+        <p class="subtitle">URL 또는 HTML 코드를 입력하면 텍스트를 자동으로 추출합니다</p>
+
+        <div class="info-box">
+            ⚠️ <strong>제외 영역:</strong> .nav, .footer_24, .partners_logo__slide__wrap 요소는 자동으로 제외됩니다
+        </div>
+
+        <div class="method-tabs">
+            <button class="tab active" onclick="switchTab('url')">URL로 추출</button>
+            <button class="tab" onclick="switchTab('html')">HTML 직접 입력</button>
+        </div>
+
+        <div id="urlMethod" class="method-content active">
+            <div class="input-section">
+                <label for="pageUrl">웹페이지 URL</label>
+                <input type="text" id="pageUrl" placeholder="https://aistudios.com/example-page" />
+            </div>
+            <button onclick="extractFromUrl()" id="extractUrlBtn">
+                텍스트 추출
+            </button>
+        </div>
+
+        <div id="htmlMethod" class="method-content">
+            <div class="input-section">
+                <label for="htmlInput">HTML 코드 (페이지 소스 전체를 붙여넣으세요)</label>
+                <textarea id="htmlInput" placeholder="<!DOCTYPE html>..."></textarea>
+            </div>
+            <button onclick="extractFromHtml()" id="extractHtmlBtn">
+                텍스트 추출
+            </button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="results" id="results">
+            <div class="result-header">
+                <div class="result-title">📋 추출된 텍스트</div>
+                <div class="result-count" id="resultCount"></div>
+            </div>
+            <button class="secondary-btn" onclick="copyAllTexts()">전체 복사</button>
+            <button class="secondary-btn" onclick="downloadAsText()">TXT 다운로드</button>
+            <div class="text-list" id="textList"></div>
+        </div>
+    </div>
+
+    <script>
+        let extractedTexts = [];
+
+        function switchTab(method) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.method-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(method + 'Method').classList.add('active');
+        }
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+        }
+
+        function extractTextFromHTML(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Remove excluded elements
+            doc.querySelectorAll('.nav, .footer_24, .partners_logo__slide__wrap, script, style, noscript, meta, link').forEach(el => el.remove());
+            
+            const extractedItems = [];
+            const seenTexts = new Set();
+            
+            // Helper to get plain text for deduplication
+            function getPlainText(element) {
+                return element.textContent.trim().replace(/\s+/g, ' ');
+            }
+            
+            // Helper to check if element should be extracted
+            function shouldExtract(element) {
+                const tagName = element.tagName.toLowerCase();
+                const allowedTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'p', 'li', 'a', 'span', 'div'];
+                return allowedTags.includes(tagName);
+            }
+            
+            // Helper to check if element has nested block elements
+            function hasNestedBlocks(element) {
+                return element.querySelector('p, h1, h2, h3, h4, h5, li, div');
+            }
+            
+            // Walk through DOM in document order
+            function walkDOM(node) {
+                if (node.nodeType === Node.ELEMENT_NODE && shouldExtract(node)) {
+                    const tagName = node.tagName.toLowerCase();
+                    const htmlContent = node.innerHTML.trim();
+                    const plainText = getPlainText(node);
+                    
+                    // Skip if already seen
+                    if (seenTexts.has(plainText)) {
+                        return;
+                    }
+                    
+                    // Skip empty content
+                    if (!plainText || plainText.length === 0) {
+                        return;
+                    }
+                    
+                    // For divs and spans, only extract if no nested block elements
+                    if ((tagName === 'div' || tagName === 'span') && hasNestedBlocks(node)) {
+                        // Continue walking children
+                        for (let child of node.children) {
+                            walkDOM(child);
+                        }
+                        return;
+                    }
+                    
+                    // Skip very long content (likely full sections)
+                    if (plainText.length > 2000) {
+                        return;
+                    }
+                    
+                    // Add to extracted items
+                    seenTexts.add(plainText);
+                    extractedItems.push({
+                        type: tagName.toUpperCase(),
+                        html: htmlContent,
+                        text: plainText
+                    });
+                    
+                    return; // Don't walk children since we extracted this element
+                }
+                
+                // Continue walking for other elements
+                for (let child of node.children) {
+                    walkDOM(child);
+                }
+            }
+            
+            // Start walking from body
+            walkDOM(doc.body);
+            
+            return extractedItems;
+        }
+
+        async function extractFromUrl() {
+            const pageUrl = document.getElementById('pageUrl').value.trim();
+
+            if (!pageUrl) {
+                showStatus('URL을 입력해주세요', 'error');
+                return;
+            }
+
+            const extractBtn = document.getElementById('extractUrlBtn');
+            extractBtn.disabled = true;
+            extractBtn.innerHTML = '추출 중<span class="loading"></span>';
+
+            try {
+                showStatus('페이지 내용을 가져오는 중...', 'info');
+
+                // Try multiple CORS proxy services
+                const proxyUrls = [
+                    'https://api.allorigins.win/raw?url=',
+                    'https://corsproxy.io/?'
+                ];
+
+                let html = null;
+                let lastError = null;
+
+                for (const proxy of proxyUrls) {
+                    try {
+                        const response = await fetch(proxy + encodeURIComponent(pageUrl));
+                        if (response.ok) {
+                            html = await response.text();
+                            break;
+                        }
+                    } catch (e) {
+                        lastError = e;
+                    }
+                }
+
+                if (!html) {
+                    throw new Error('페이지를 가져올 수 없습니다. HTML 직접 입력 방식을 사용해주세요.');
+                }
+
+                processExtractedHtml(html);
+
+            } catch (error) {
+                console.error(error);
+                showStatus('오류: ' + error.message + ' → "HTML 직접 입력" 탭을 사용해보세요!', 'error');
+            } finally {
+                extractBtn.disabled = false;
+                extractBtn.textContent = '텍스트 추출';
+            }
+        }
+
+        function extractFromHtml() {
+            const html = document.getElementById('htmlInput').value.trim();
+
+            if (!html) {
+                showStatus('HTML 코드를 입력해주세요', 'error');
+                return;
+            }
+
+            const extractBtn = document.getElementById('extractHtmlBtn');
+            extractBtn.disabled = true;
+            extractBtn.innerHTML = '추출 중<span class="loading"></span>';
+
+            try {
+                processExtractedHtml(html);
+            } catch (error) {
+                console.error(error);
+                showStatus('오류: ' + error.message, 'error');
+            } finally {
+                extractBtn.disabled = false;
+                extractBtn.textContent = '텍스트 추출';
+            }
+        }
+
+        function processExtractedHtml(html) {
+            showStatus('텍스트를 추출하는 중...', 'info');
+            
+            extractedTexts = extractTextFromHTML(html);
+
+            if (extractedTexts.length === 0) {
+                showStatus('추출된 텍스트가 없습니다.', 'error');
+                return;
+            }
+
+            displayResults(extractedTexts);
+            showStatus(`${extractedTexts.length}개의 텍스트를 추출했습니다! ✅`, 'success');
+        }
+
+        function displayResults(items) {
+            const resultsDiv = document.getElementById('results');
+            const textListDiv = document.getElementById('textList');
+            const countDiv = document.getElementById('resultCount');
+            
+            resultsDiv.style.display = 'block';
+            countDiv.textContent = `총 ${items.length}개`;
+            textListDiv.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'text-item';
+                
+                // Create type badge with color
+                const typeColor = {
+                    'H1': '#e74c3c',
+                    'H2': '#e67e22',
+                    'H3': '#f39c12',
+                    'H4': '#f1c40f',
+                    'H5': '#3498db',
+                    'P': '#2ecc71',
+                    'LI': '#9b59b6',
+                    'DIV': '#95a5a6',
+                    'SPAN': '#34495e',
+                    'A': '#1abc9c'
+                }[item.type] || '#7f8c8d';
+                
+                itemDiv.innerHTML = `
+                    <div class="text-number">
+                        <span style="background: ${typeColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 8px;">${item.type}</span>
+                        #${index + 1}
+                    </div>
+                    <div class="text-content" id="text-${index}">${item.html}</div>
+                    <button class="copy-btn" onclick="copyText(${index})">복사</button>
+                `;
+                textListDiv.appendChild(itemDiv);
+            });
+
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function copyText(index) {
+            const item = extractedTexts[index];
+            // Copy plain text only (no HTML tags)
+            const textToCopy = item.text;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const btn = document.querySelector(`#text-${index}`).nextElementSibling;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ 복사됨';
+                btn.style.background = '#4caf50';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            });
+        }
+
+        function copyAllTexts() {
+            const text = extractedTexts.map(item => item.text).join('\n\n');
+            navigator.clipboard.writeText(text).then(() => {
+                showStatus('전체 텍스트가 클립보드에 복사되었습니다!', 'success');
+            });
+        }
+
+        function downloadAsText() {
+            const text = extractedTexts.map((item, i) => `${i + 1}. [${item.type}] ${item.text}`).join('\n\n');
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'extracted-texts.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
